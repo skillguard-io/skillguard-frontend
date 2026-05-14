@@ -1,17 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Shield,
-  ShieldCheck,
-  ShieldAlert,
+import { 
+  Shield, 
+  ShieldCheck, 
+  ShieldAlert, 
   ShieldX,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Github,
-  Search,
+  AlertTriangle, 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  Github, 
+  Search, 
   Lock,
   Mail,
   Code,
@@ -121,21 +121,21 @@ function VerdictCard({ result }: { result: ScanResult }) {
           <div className={`w-20 h-20 rounded-full ${verdict.iconBg} flex items-center justify-center mb-4 shadow-lg`}>
             <Icon className="h-10 w-10 text-white" />
           </div>
-
+          
           <h2 className={`text-2xl sm:text-3xl font-bold ${verdict.color} mb-2`}>
             {verdict.title}
           </h2>
-
+          
           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${verdict.bgColor} border ${verdict.borderColor} mb-4`}>
             <span className="text-sm text-muted-foreground">Score de riesgo:</span>
             <span className={`text-2xl font-bold ${verdict.color}`}>{result.score}</span>
             <span className="text-sm text-muted-foreground">/100</span>
           </div>
-
+          
           <p className="text-muted-foreground max-w-xl leading-relaxed mb-6">
             {result.resumen}
           </p>
-
+          
           <div className="flex flex-wrap items-center justify-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-card rounded-lg border border-border shadow-sm">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
@@ -156,10 +156,10 @@ function VerdictCard({ result }: { result: ScanResult }) {
   )
 }
 
-function LockedReportSection({
+function LockedReportSection({ 
   result,
   analyzedUrl,
-}: {
+}: { 
   result: ScanResult
   analyzedUrl: string
 }) {
@@ -232,7 +232,7 @@ function LockedReportSection({
               </div>
               <h3 className="text-xl font-bold text-success mb-2">Informe enviado</h3>
               <p className="text-muted-foreground max-w-md">
-                Hemos enviado el informe completo a <strong className="text-foreground">{email}</strong>.
+                Hemos enviado el informe completo a <strong className="text-foreground">{email}</strong>. 
                 Revisa tu bandeja de entrada.
               </p>
             </div>
@@ -274,7 +274,7 @@ function LockedReportSection({
             <p className="text-sm text-muted-foreground mb-4 max-w-md">
               Introduce tu email para recibir el análisis detallado con todos los flags detectados.
             </p>
-
+            
             <form onSubmit={handleUnlock} className="w-full max-w-sm space-y-3">
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -287,13 +287,13 @@ function LockedReportSection({
                   disabled={isSending}
                 />
               </div>
-
+              
               {sendError && (
                 <p className="text-sm text-danger">{sendError}</p>
               )}
-
-              <Button
-                type="submit"
+              
+              <Button 
+                type="submit" 
                 className="w-full h-11"
                 disabled={!isValidEmail || isSending}
               >
@@ -310,7 +310,7 @@ function LockedReportSection({
                 )}
               </Button>
             </form>
-
+            
             <p className="text-xs text-muted-foreground mt-3">
               Recibirás el informe completo en tu email
             </p>
@@ -327,11 +327,11 @@ function ResultsDisplay({ result, analyzedUrl }: { result: ScanResult; analyzedU
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <VerdictCard result={result} />
-
+      
       {totalFlags > 0 && (
         <LockedReportSection result={result} analyzedUrl={analyzedUrl} />
       )}
-
+      
       {totalFlags === 0 && (
         <Card className="border-success/30 bg-success/5 mt-8">
           <CardContent className="py-8 text-center">
@@ -396,7 +396,7 @@ function HeroSection({
           ¿Es seguro este skill de IA?
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-          Analiza cualquier skill de GitHub antes de instalarlo. Detectamos código malicioso,
+          Analiza cualquier skill de GitHub antes de instalarlo. Detectamos código malicioso, 
           comportamientos sospechosos y vulnerabilidades de seguridad.
         </p>
       </div>
@@ -502,8 +502,8 @@ function WhatWeDetect() {
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {threats.map((threat, index) => (
-          <div
-            key={index}
+          <div 
+            key={index} 
             className="flex items-center gap-3 p-4 rounded-lg bg-card border border-border hover:shadow-md transition-shadow"
           >
             <div className={`flex-shrink-0 ${threat.color}`}>
@@ -570,7 +570,7 @@ export default function SkillGuardPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-
+      
       <main className="flex-1 container mx-auto px-4 max-w-5xl">
         <HeroSection onAnalyze={handleAnalyze} isLoading={isLoading} />
 
