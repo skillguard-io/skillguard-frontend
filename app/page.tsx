@@ -22,7 +22,8 @@ import {
   Link2,
   EyeOff,
   Binary,
-  Users
+  Users,
+  Download
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,6 +57,8 @@ function Header({ user, onLogin, onLogout }: {
   onLogin: () => void
   onLogout: () => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -72,33 +75,50 @@ function Header({ user, onLogin, onLogout }: {
         </div>
 
         <div className="flex items-center gap-3">
-          <a href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Github className="h-5 w-5" />
-            <span className="hidden sm:inline">GitHub</span>
-          </a>
-
           {user ? (
-            <div className="flex items-center gap-2">
-              {user.user_metadata?.avatar_url && (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="avatar"
-                  className="w-8 h-8 rounded-full"
-                />
-              )}
-              <span className="text-sm font-medium hidden sm:inline">
-                {user.user_metadata?.user_name || user.email}
-              </span>
+            <div className="relative">
               <button
-                onClick={onLogout}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="flex items-center gap-2 rounded-full hover:ring-2 hover:ring-primary transition-all"
               >
-                Salir
+                {user.user_metadata?.avatar_url ? (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="avatar"
+                    className="w-9 h-9 rounded-full"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium text-sm">
+                    {(user.user_metadata?.user_name || user.email || "U")[0].toUpperCase()}
+                  </div>
+                )}
               </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-medium">{user.user_metadata?.user_name || "Usuario"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <div className="py-1">
+
+                    <a href="/dashboard"
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition-colors"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Mi Dashboard
+                    </a>
+                    <button
+                      onClick={() => { onLogout(); setMenuOpen(false) }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <button
@@ -190,6 +210,170 @@ function VerdictCard({ result }: { result: ScanResult }) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function UnlockedReportSection({ result, analyzedUrl }: {
+  result: ScanResult
+  analyzedUrl: string
+}) {
+  const handleDownload = () => {
+    const { jsPDF } = require('jspdf')
+    const doc = new jsPDF()
+
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const maxWidth = pageWidth - margin * 2
+    let y = 20
+
+    const addText = (text: string, size = 10, bold = false, color = [0, 0, 0]) => {
+      doc.setFontSize(size)
+      doc.setFont('helvetica', bold ? 'bold' : 'normal')
+      doc.setTextColor(color[0], color[1], color[2])
+      const lines = doc.splitTextToSize(text, maxWidth)
+      if (y + lines.length * (size * 0.4) > 280) {
+        doc.addPage()
+        y = 20
+      }
+      doc.text(lines, margin, y)
+      y += lines.length * (size * 0.4) + 3
+    }
+
+    const addLine = () => {
+      doc.setDrawColor(200, 200, 200)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 6
+    }
+
+    // Header
+    doc.setFillColor(22, 163, 74)
+    doc.rect(0, 0, pageWidth, 30, 'F')
+    doc.setFontSize(18)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text('SkillGuard — Informe de Seguridad', margin, 19)
+    y = 40
+
+    // Score y veredicto
+    const scoreColor = result.score > 60 ? [220, 38, 38] : result.score > 30 ? [217, 119, 6] : [22, 163, 74]
+    addText(`Veredicto: ${result.veredicto}`, 14, true, scoreColor)
+    addText(`Score de riesgo: ${result.score}/100`, 12, false, scoreColor)
+    addText(`Score estático: ${result.score_estatico}/100  |  Score semántico: ${result.score_semantico}/100`, 10)
+    addText(`URL analizada: ${analyzedUrl}`, 9, false, [100, 100, 100])
+    addText(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, 9, false, [100, 100, 100])
+    y += 4
+    addLine()
+
+    // Resumen
+    addText('Resumen del análisis', 12, true)
+    addText(result.resumen, 10)
+    y += 4
+    addLine()
+
+    // Flags estáticos
+    if (result.flags_estaticos.length > 0) {
+      addText(`Flags Estáticos (${result.flags_estaticos.length})`, 12, true)
+      y += 2
+      result.flags_estaticos.forEach((flag, i) => {
+        const color = flag.severidad === 'HIGH' ? [220, 38, 38] : flag.severidad === 'MEDIUM' ? [217, 119, 6] : [37, 99, 235]
+        addText(`${i + 1}. [${flag.severidad}] ${flag.categoria} — línea ${flag.linea}`, 10, true, color)
+        addText(flag.descripcion, 9)
+        if (flag.texto) addText(`Texto: ${flag.texto}`, 9, false, [100, 100, 100])
+        if (flag.url) addText(`URL: ${flag.url}`, 9, false, [100, 100, 100])
+        if (flag.decoded) addText(`Decoded: ${flag.decoded}`, 9, false, [100, 100, 100])
+        y += 2
+      })
+      addLine()
+    }
+
+    // Flags semánticos
+    if (result.flags_semanticos.length > 0) {
+      addText(`Flags Semánticos (${result.flags_semanticos.length})`, 12, true)
+      y += 2
+      result.flags_semanticos.forEach((flag, i) => {
+        const color = flag.severidad === 'HIGH' ? [220, 38, 38] : flag.severidad === 'MEDIUM' ? [217, 119, 6] : [37, 99, 235]
+        addText(`${i + 1}. [${flag.severidad}] ${flag.categoria} — línea ${flag.linea}`, 10, true, color)
+        if (flag.explicacion) addText(flag.explicacion, 9)
+        if (flag.texto) addText(`Texto: ${flag.texto}`, 9, false, [100, 100, 100])
+        y += 2
+      })
+      addLine()
+    }
+
+    // Footer
+    addText('SkillGuard © 2026 — Seguridad para la era de los agentes IA', 9, false, [150, 150, 150])
+
+    doc.save(`skillguard-informe-${new Date().toISOString().split('T')[0]}.pdf`)
+  }
+
+  const getSeverityColor = (severidad: string) => {
+    if (severidad === 'HIGH') return 'text-red-600 bg-red-50 border-red-200'
+    if (severidad === 'MEDIUM') return 'text-amber-600 bg-amber-50 border-amber-200'
+    return 'text-blue-600 bg-blue-50 border-blue-200'
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Informe completo de seguridad</h3>
+        <Button variant="outline" onClick={handleDownload} className="flex items-center gap-2">
+          <Download className="h-4 w-4" />
+          Descargar informe
+        </Button>
+      </div>
+
+      {/* Flags estáticos */}
+      {result.flags_estaticos.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Flags estáticos ({result.flags_estaticos.length})
+          </h4>
+          <div className="space-y-3">
+            {result.flags_estaticos.map((flag, i) => (
+              <div key={i} className={`border rounded-lg p-4 ${getSeverityColor(flag.severidad)}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded border">
+                    {flag.severidad}
+                  </span>
+                  <span className="text-sm font-medium">{flag.categoria}</span>
+                  <span className="text-xs opacity-60 ml-auto">línea {flag.linea}</span>
+                </div>
+                <p className="text-sm opacity-80">{flag.descripcion}</p>
+                {flag.texto && <code className="text-xs mt-1 block opacity-70">{flag.texto}</code>}
+                {flag.url && <code className="text-xs mt-1 block opacity-70">{flag.url}</code>}
+                {flag.decoded && <code className="text-xs mt-1 block opacity-70">Decoded: {flag.decoded}</code>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Flags semánticos */}
+      {result.flags_semanticos.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Flags semánticos ({result.flags_semanticos.length})
+          </h4>
+          <div className="space-y-3">
+            {result.flags_semanticos.map((flag, i) => (
+              <div key={i} className={`border rounded-lg p-4 ${getSeverityColor(flag.severidad)}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded border">
+                    {flag.severidad}
+                  </span>
+                  <span className="text-sm font-medium">{flag.categoria}</span>
+                  <span className="text-xs opacity-60 ml-auto">línea {flag.linea}</span>
+                </div>
+                <p className="text-sm opacity-80">{flag.explicacion}</p>
+                {flag.texto && <code className="text-xs mt-1 block opacity-70">{flag.texto}</code>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -358,7 +542,11 @@ function LockedReportSection({
   )
 }
 
-function ResultsDisplay({ result, analyzedUrl }: { result: ScanResult; analyzedUrl: string }) {
+function ResultsDisplay({ result, analyzedUrl, user }: {
+  result: ScanResult
+  analyzedUrl: string
+  user: User | null
+}) {
   const totalFlags = result.flags_estaticos.length + result.flags_semanticos.length
 
   return (
@@ -366,7 +554,9 @@ function ResultsDisplay({ result, analyzedUrl }: { result: ScanResult; analyzedU
       <VerdictCard result={result} />
 
       {totalFlags > 0 && (
-        <LockedReportSection result={result} analyzedUrl={analyzedUrl} />
+        user
+          ? <UnlockedReportSection result={result} analyzedUrl={analyzedUrl} />
+          : <LockedReportSection result={result} analyzedUrl={analyzedUrl} />
       )}
 
       {totalFlags === 0 && (
@@ -667,8 +857,7 @@ export default function SkillGuardPage() {
           </Card>
         )}
 
-        {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} />}
-
+        {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} />}
         <HowItWorks />
         <WhatWeDetect />
       </main>
