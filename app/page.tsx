@@ -213,6 +213,144 @@ function VerdictCard({ result }: { result: ScanResult }) {
   )
 }
 
+function ProjectSelector({ user, scanId, onProjectAssigned }: {
+  user: User
+  scanId: string | null
+  onProjectAssigned: (projectId: string, projectName: string) => void
+}) {
+  const [proyectos, setProyectos] = useState<{ id: string; nombre: string }[]>([])
+  const [selectedProject, setSelectedProject] = useState<string>("")
+  const [creatingNew, setCreatingNew] = useState(false)
+  const [newProjectName, setNewProjectName] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [assigned, setAssigned] = useState(false)
+
+  useEffect(() => {
+    cargarProyectos()
+  }, [])
+
+  const cargarProyectos = async () => {
+    const { data } = await supabase
+      .from('proyectos')
+      .select('id, nombre')
+      .order('created_at', { ascending: false })
+    setProyectos(data || [])
+    if (!data || data.length === 0) setCreatingNew(true)
+  }
+
+  const handleAssign = async () => {
+    if (!scanId) return
+    setIsLoading(true)
+
+    try {
+      let projectId = selectedProject
+
+      // Crear nuevo proyecto si es necesario
+      if (creatingNew && newProjectName.trim()) {
+        const { data, error } = await supabase
+          .from('proyectos')
+          .insert({ nombre: newProjectName.trim(), user_id: user.id })
+          .select()
+          .single()
+
+        if (error) throw error
+        projectId = data.id
+      }
+
+      if (!projectId) return
+
+      // Asignar scan al proyecto
+      await supabase
+        .from('scans')
+        .update({ proyecto_id: projectId })
+        .eq('id', scanId)
+
+      const projectName = creatingNew
+        ? newProjectName.trim()
+        : proyectos.find(p => p.id === projectId)?.nombre || ''
+
+      setAssigned(true)
+      onProjectAssigned(projectId, projectName)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (assigned) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-success mt-2">
+        <CheckCircle className="h-4 w-4" />
+        Scan asignado al proyecto correctamente
+      </div>
+    )
+  }
+
+  return (
+    <Card className="mt-6 border-dashed">
+      <CardContent className="py-4">
+        <p className="text-sm font-medium mb-3">Asignar a un proyecto</p>
+
+        {!creatingNew && proyectos.length > 0 ? (
+          <div className="flex gap-2">
+            <select
+              value={selectedProject}
+              onChange={e => {
+                if (e.target.value === '__new__') {
+                  setCreatingNew(true)
+                  setSelectedProject('')
+                } else {
+                  setSelectedProject(e.target.value)
+                }
+              }}
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm bg-background"
+            >
+              <option value="">Selecciona un proyecto...</option>
+              {proyectos.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+              <option value="__new__">+ Crear nuevo proyecto</option>
+            </select>
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedProject || isLoading}
+              size="sm"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Asignar'}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {proyectos.length > 0 && (
+              <button
+                onClick={() => setCreatingNew(false)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                ← Volver
+              </button>
+            )}
+            <input
+              type="text"
+              placeholder="Nombre del proyecto..."
+              value={newProjectName}
+              onChange={e => setNewProjectName(e.target.value)}
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm bg-background"
+            />
+            <Button
+              onClick={handleAssign}
+              disabled={!newProjectName.trim() || isLoading}
+              size="sm"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Crear y asignar'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function UnlockedReportSection({ result, analyzedUrl }: {
   result: ScanResult
   analyzedUrl: string
@@ -542,10 +680,11 @@ function LockedReportSection({
   )
 }
 
-function ResultsDisplay({ result, analyzedUrl, user }: {
+function ResultsDisplay({ result, analyzedUrl, user, scanId }: {
   result: ScanResult
   analyzedUrl: string
   user: User | null
+  scanId: string | null
 }) {
   const totalFlags = result.flags_estaticos.length + result.flags_semanticos.length
 
@@ -553,22 +692,46 @@ function ResultsDisplay({ result, analyzedUrl, user }: {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <VerdictCard result={result} />
 
-      {totalFlags > 0 && (
-        user
-          ? <UnlockedReportSection result={result} analyzedUrl={analyzedUrl} />
-          : <LockedReportSection result={result} analyzedUrl={analyzedUrl} />
-      )}
+      {user ? (
+        <>
+          {totalFlags > 0 && <UnlockedReportSection result={result} analyzedUrl={analyzedUrl} />}
 
-      {totalFlags === 0 && (
-        <Card className="border-success/30 bg-success/5 mt-8">
-          <CardContent className="py-8 text-center">
-            <CheckCircle className="h-10 w-10 text-success mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-success mb-1">Sin amenazas detectadas</h3>
-            <p className="text-sm text-muted-foreground">
-              No hemos encontrado ningún patrón sospechoso en este skill.
-            </p>
-          </CardContent>
-        </Card>
+          {totalFlags === 0 && (
+            <Card className="border-success/30 bg-success/5 mt-8">
+              <CardContent className="py-8 text-center">
+                <CheckCircle className="h-10 w-10 text-success mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-success mb-1">Sin amenazas detectadas</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hemos encontrado ningún patrón sospechoso en este skill.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <ProjectSelector
+            user={user}
+            scanId={scanId}
+            onProjectAssigned={(projectId, projectName) => {
+              console.log('Asignado a:', projectName)
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {totalFlags > 0 && <LockedReportSection result={result} analyzedUrl={analyzedUrl} />}
+
+          {totalFlags === 0 && (
+            <Card className="border-success/30 bg-success/5 mt-8">
+              <CardContent className="py-8 text-center">
+                <CheckCircle className="h-10 w-10 text-success mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-success mb-1">Sin amenazas detectadas</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hemos encontrado ningún patrón sospechoso en este skill.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )
@@ -766,6 +929,7 @@ export default function SkillGuardPage() {
   const [error, setError] = useState<string | null>(null)
   const [analyzedUrl, setAnalyzedUrl] = useState("")
   const [user, setUser] = useState<User | null>(null)  // ← AÑADIR
+  const [scanId, setScanId] = useState<string | null>(null)
 
   // ← AÑADIR ESTO
   useEffect(() => {
@@ -815,9 +979,10 @@ export default function SkillGuardPage() {
 
       const data = await response.json()
       setResult(data)
+
       // Guardar scan en Supabase si hay sesión
       if (user) {
-        await supabase.from('scans').insert({
+        const scanData = await supabase.from('scans').insert({
           user_id: user.id,
           url: url,
           score: data.score,
@@ -825,10 +990,11 @@ export default function SkillGuardPage() {
           score_semantico: data.score_semantico,
           veredicto: data.veredicto,
           resumen: data.resumen,
-          total_flags: data.total_flags,
           flags_estaticos: data.flags_estaticos,
           flags_semanticos: data.flags_semanticos
-        })
+        }).select().single()
+
+        if (scanData.data) setScanId(scanData.data.id)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al analizar el skill")
@@ -857,7 +1023,7 @@ export default function SkillGuardPage() {
           </Card>
         )}
 
-        {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} />}
+        {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} />}
         <HowItWorks />
         <WhatWeDetect />
       </main>
