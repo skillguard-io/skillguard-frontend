@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef  } from "react"
 import {
   Shield,
   ShieldCheck,
@@ -23,7 +23,8 @@ import {
   EyeOff,
   Binary,
   Users,
-  Download
+  Download,
+  Upload
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -765,19 +766,61 @@ function LoadingState() {
 
 function HeroSection({
   onAnalyze,
+  onAnalyzeContent,
   isLoading,
 }: {
   onAnalyze: (url: string) => void
+  onAnalyzeContent: (contenido: string, nombre: string) => void
   isLoading: boolean
 }) {
+  const [activeTab, setActiveTab] = useState<'url' | 'file' | 'text'>('url')
   const [url, setUrl] = useState("")
+  const [texto, setTexto] = useState("")
+  const [fileName, setFileName] = useState("")
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (url.trim()) {
-      onAnalyze(url.trim())
-    }
+    if (url.trim()) onAnalyze(url.trim())
   }
+
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (texto.trim()) onAnalyzeContent(texto.trim(), "skill_pegado.md")
+  }
+
+  const processFile = (file: File) => {
+    if (file.size > 500000) {
+      alert("El archivo supera el límite de 500KB")
+      return
+    }
+    setFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const contenido = e.target?.result as string
+      onAnalyzeContent(contenido, file.name)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) processFile(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) processFile(file)
+  }
+
+  const tabs = [
+    { id: 'url' as const, label: 'URL de GitHub', icon: <Github className="h-4 w-4" /> },
+    { id: 'file' as const, label: 'Subir archivo', icon: <Upload className="h-4 w-4" /> },
+    { id: 'text' as const, label: 'Pegar texto', icon: <FileText className="h-4 w-4" /> },
+  ]
 
   return (
     <section className="py-12 lg:py-20">
@@ -786,48 +829,111 @@ function HeroSection({
           ¿Es seguro este skill de IA?
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-          Analiza cualquier skill de GitHub antes de instalarlo. Detectamos código malicioso,
+          Analiza cualquier skill antes de instalarlo. Detectamos código malicioso,
           comportamientos sospechosos y vulnerabilidades de seguridad.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto">
+        {/* Tabs */}
+        <div className="flex gap-1 mb-3 bg-muted p-1 rounded-lg">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? 'bg-background shadow text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
         <Card className="shadow-lg border-2">
-          <CardContent className="p-2">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Github className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="url"
-                  placeholder="https://github.com/usuario/skill"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="pl-12 h-12 text-base border-0 bg-muted/50 focus-visible:ring-1 focus-visible:ring-primary"
+          <CardContent className="p-3">
+
+            {/* Tab URL */}
+            {activeTab === 'url' && (
+              <form onSubmit={handleUrlSubmit}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Github className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      type="url"
+                      placeholder="https://github.com/usuario/repo/blob/main/SKILL.md"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className="pl-12 h-12 text-base border-0 bg-muted/50"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button type="submit" size="lg" className="h-12 px-6 font-semibold" disabled={isLoading || !url.trim()}>
+                    {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Analizando...</> : <><Search className="mr-2 h-5 w-5" />Analizar</>}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Tab Archivo */}
+            {activeTab === 'file' && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".md,.txt"
+                  onChange={handleFileChange}
+                  className="hidden"
                   disabled={isLoading}
                 />
-              </div>
-              <Button
-                type="submit"
-                size="lg"
-                className="h-12 px-6 text-base font-semibold shadow-md"
-                disabled={isLoading || !url.trim()}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Analizando...
-                  </>
+                {isLoading && fileName ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm font-medium">Analizando {fileName}...</p>
+                  </div>
                 ) : (
-                  <>
-                    <Search className="mr-2 h-5 w-5" />
-                    Analizar ahora
-                  </>
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      {fileName ? `✅ ${fileName}` : 'Arrastra tu SKILL.md aquí'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">o haz clic para seleccionar — máx 500KB</p>
+                  </div>
                 )}
-              </Button>
-            </div>
+              </div>
+            )}
+
+            {/* Tab Texto */}
+            {activeTab === 'text' && (
+              <form onSubmit={handleTextSubmit} className="space-y-2">
+                <textarea
+                  placeholder="Pega aquí el contenido de tu SKILL.md..."
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  disabled={isLoading}
+                  rows={6}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-muted/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <Button type="submit" className="w-full h-11 font-semibold" disabled={isLoading || !texto.trim()}>
+                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analizando...</> : <><Search className="mr-2 h-4 w-4" />Analizar texto</>}
+                </Button>
+              </form>
+            )}
+
           </CardContent>
         </Card>
-      </form>
+      </div>
     </section>
   )
 }
@@ -1003,12 +1109,52 @@ export default function SkillGuardPage() {
     }
   }
 
+  const handleAnalyzeContent = async (contenido: string, nombre: string) => {
+    setIsLoading(true)
+    setResult(null)
+    setError(null)
+    setAnalyzedUrl(nombre)
+    setScanId(null)
+
+    try {
+      const response = await fetch("https://web-production-cf779.up.railway.app/scan/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contenido, nombre })
+      })
+
+      if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
+
+      const data = await response.json()
+      setResult(data)
+
+      if (user) {
+        const scanData = await supabase.from('scans').insert({
+          user_id: user.id,
+          url: nombre,
+          score: data.score,
+          score_estatico: data.score_estatico,
+          score_semantico: data.score_semantico,
+          veredicto: data.veredicto,
+          resumen: data.resumen,
+          flags_estaticos: data.flags_estaticos,
+          flags_semanticos: data.flags_semanticos
+        }).select().single()
+
+        if (scanData.data) setScanId(scanData.data.id)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al analizar el skill")
+    } finally {
+      setIsLoading(false)
+    }
+  }
   return (
     <div className="min-h-screen flex flex-col">
       <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
 
       <main className="flex-1 container mx-auto px-4 max-w-5xl">
-        <HeroSection onAnalyze={handleAnalyze} isLoading={isLoading} />
+        <HeroSection onAnalyze={handleAnalyze} onAnalyzeContent={handleAnalyzeContent} isLoading={isLoading} />
 
         {isLoading && <LoadingState />}
 
