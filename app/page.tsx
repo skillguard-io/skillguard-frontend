@@ -681,17 +681,20 @@ function LockedReportSection({
   )
 }
 
-function ResultsDisplay({ result, analyzedUrl, user, scanId }: {
+function ResultsDisplay({ result, analyzedUrl, user, scanId, resultRef }: {
   result: ScanResult
   analyzedUrl: string
   user: User | null
   scanId: string | null
+  resultRef: React.RefObject<HTMLDivElement | null>
 }) {
   const totalFlags = result.flags_estaticos.length + result.flags_semanticos.length
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={resultRef}>
       <VerdictCard result={result} />
+      </div>
 
       {user ? (
         <>
@@ -1176,9 +1179,7 @@ export default function SkillGuardPage() {
           </Card>
         )}
 
-        <div ref={resultRef}>
-          {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} />}
-        </div>
+          {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} resultRef={resultRef} />}
         <HowItWorks />
         <WhatWeDetect />
       </main>
