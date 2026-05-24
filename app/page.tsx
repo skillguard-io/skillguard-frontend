@@ -1036,8 +1036,15 @@ export default function SkillGuardPage() {
   const [analyzedUrl, setAnalyzedUrl] = useState("")
   const [user, setUser] = useState<User | null>(null)  // ← AÑADIR
   const [scanId, setScanId] = useState<string | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
 
   // ← AÑADIR ESTO
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [result])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -1169,7 +1176,9 @@ export default function SkillGuardPage() {
           </Card>
         )}
 
-        {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} />}
+        <div ref={resultRef}>
+          {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} />}
+        </div>
         <HowItWorks />
         <WhatWeDetect />
       </main>
