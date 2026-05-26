@@ -519,9 +519,11 @@ function UnlockedReportSection({ result, analyzedUrl }: {
 function LockedReportSection({
   result,
   analyzedUrl,
+  reportToken
 }: {
   result: ScanResult
   analyzedUrl: string
+  reportToken: string | null
 }) {
   const [email, setEmail] = useState("")
   const [isValidEmail, setIsValidEmail] = useState(false)
@@ -563,6 +565,7 @@ function LockedReportSection({
           total_flags: result.flags_estaticos.length + result.flags_semanticos.length,
           flags_estaticos: result.flags_estaticos,
           flags_semanticos: result.flags_semanticos,
+          report_token: reportToken,
         }),
       })
 
@@ -681,12 +684,13 @@ function LockedReportSection({
   )
 }
 
-function ResultsDisplay({ result, analyzedUrl, user, scanId, resultRef }: {
+function ResultsDisplay({ result, analyzedUrl, user, scanId, resultRef, reportToken }: {
   result: ScanResult
   analyzedUrl: string
   user: User | null
   scanId: string | null
   resultRef: React.RefObject<HTMLDivElement | null>
+  reportToken: string | null
 }) {
   const totalFlags = result.flags_estaticos.length + result.flags_semanticos.length
 
@@ -722,7 +726,7 @@ function ResultsDisplay({ result, analyzedUrl, user, scanId, resultRef }: {
         </>
       ) : (
         <>
-          {totalFlags > 0 && <LockedReportSection result={result} analyzedUrl={analyzedUrl} />}
+          {totalFlags > 0 && <LockedReportSection result={result} analyzedUrl={analyzedUrl} reportToken={reportToken} />}
 
           {totalFlags === 0 && (
             <Card className="border-success/30 bg-success/5 mt-8">
@@ -920,14 +924,23 @@ function HeroSection({
             {/* Tab Texto */}
             {activeTab === 'text' && (
               <form onSubmit={handleTextSubmit} className="space-y-2">
-                <textarea
-                  placeholder="Pega aquí el contenido de tu SKILL.md..."
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  disabled={isLoading}
-                  rows={6}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-muted/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+                <div className="relative">
+                  <textarea
+                    placeholder="Pega aquí el contenido de tu SKILL.md..."
+                    value={texto}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 50000) {
+                        setTexto(e.target.value)
+                      }
+                    }}
+                    disabled={isLoading}
+                    rows={6}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-muted/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <div className={`text-xs mt-1 text-right ${texto.length > 45000 ? 'text-orange-500' : texto.length > 49000 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                    {texto.length.toLocaleString()} / 50.000 caracteres
+                  </div>
+                </div>
                 <Button type="submit" className="w-full h-11 font-semibold" disabled={isLoading || !texto.trim()}>
                   {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analizando...</> : <><Search className="mr-2 h-4 w-4" />Analizar texto</>}
                 </Button>
@@ -1040,6 +1053,7 @@ export default function SkillGuardPage() {
   const [user, setUser] = useState<User | null>(null)  // ← AÑADIR
   const [scanId, setScanId] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement>(null)
+  const [reportToken, setReportToken] = useState<string | null>(null)
 
   // ← AÑADIR ESTO
   useEffect(() => {
@@ -1095,6 +1109,7 @@ export default function SkillGuardPage() {
 
       const data = await response.json()
       setResult(data)
+      if (data.report_token) setReportToken(data.report_token)
 
       // Guardar scan en Supabase si hay sesión
       if (user) {
@@ -1137,6 +1152,7 @@ export default function SkillGuardPage() {
 
       const data = await response.json()
       setResult(data)
+      if (data.report_token) setReportToken(data.report_token)
 
       if (user) {
         const scanData = await supabase.from('scans').insert({
@@ -1179,7 +1195,7 @@ export default function SkillGuardPage() {
           </Card>
         )}
 
-          {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} resultRef={resultRef} />}
+          {result && !isLoading && <ResultsDisplay result={result} analyzedUrl={analyzedUrl} user={user} scanId={scanId} resultRef={resultRef} reportToken={reportToken} />}
         <HowItWorks />
         <WhatWeDetect />
       </main>
